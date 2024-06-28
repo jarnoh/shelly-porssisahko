@@ -72,6 +72,7 @@
         let header = ` <tr><td class="t bg">Aika</td><td class="t bg">Hinta</td><td class="t bg">Ohjaus</td></tr>`;
         //Get cheapest hours
 
+        let activeHourPrices = [];
         //This is (and needs to be) 1:1 in both frontend and backend code
         let cheapest = [];
 
@@ -199,12 +200,21 @@
               bg = !bg;
             }
 
+            if(cmd) {
+              activeHourPrices.push(row[1]);
+            }
+
             element.innerHTML += `<tr style="${date.getHours() === new Date().getHours() && dayIndex == 0 ? `font-weight:bold;` : ``}${(bg ? "background:#ededed;" : "")}">
             <td class="fit">${formatTime(date, false)}</td>
             <td>${row[1].toFixed(2)} c/kWh</td>
             <td>${cmd ? "&#x2714;" : ""}</td>
             </tr>`;
           }
+
+          // show savings
+          let activeAvg = activeHourPrices.length && activeHourPrices.reduce((a, b) => a + b, 0) / activeHourPrices.length;
+          let activePercentage = activeAvg / s.p[dayIndex].avg * 100 - 100;
+          qs("#s-ps" + dayIndex).innerText = `${activeAvg.toFixed(2)} c/kWh (${activePercentage>0 ? '+' : ''}${activePercentage.toFixed(0)}%)`;
 
           //Only if today
           if (dayIndex == 0) {
@@ -236,7 +246,8 @@
       c("#s-pi1");
       c("#s-info");
       c("#s-st");
-
+      c("#s-ps0");
+      c("#s-ps1");
     }
   };
 
