@@ -32,6 +32,9 @@ let cfg = {
     /** Night (22...07) transfer price [c/kWh] */
     //night: 0,
 
+    /** Seasonal transfer pricing [0/1] */
+    //seasonal: 0,
+
     /** Instance names */
     //names: ['yksi', 'kaksi', 'kolme']
   },
