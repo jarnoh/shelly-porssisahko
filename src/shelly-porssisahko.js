@@ -53,6 +53,8 @@ const CNST = {
       day: 0,
       /** Night (22...07) transfer price [c/kWh] */
       night: 0,
+      /** Seasonal transfer pricing [0/1] */
+      seasonal: 0,
       /** Instance names */
       names: []
     },
@@ -734,9 +736,13 @@ function getPrices(dayIndex) {
             row[1] = row[1] / 10.0 * (100 + (row[1] > 0 ? _.c.c.vat : 0)) / 100.0;
 
             //Add transfer fees (if any)
-            let hour = new Date(row[0] * 1000).getHours();
+            const date = new Date(row[0] * 1000);
+            const hour = date.getHours();
+            const month = date.getMonth();
 
-            if (hour >= 7 && hour < 22) {
+            const seasonalSaving = _.c.c.seasonal && ((month>=3 && month<=9) || (date.getDay()==0));  // summer (apr-oct) or sunday
+
+            if (!seasonalSaving && (hour >= 7 && hour < 22)) {
               //day
               row[1] += _.c.c.day;
             } else {
