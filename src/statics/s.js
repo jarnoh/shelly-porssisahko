@@ -59,7 +59,8 @@ let STATE_STR = [
   "Pakko-ohjattu tunti", //10
   "Hinta yli maksimirajan", //11
   "Käyttäjän skriptiohjaus ylikirjoittaa", //12
-  "Tunnin ohjausminuutit käytetty" //13
+  "Tunnin ohjausminuutit käytetty", //13
+  "Käsin muokattu tunti" //14
 ]
 
 /**

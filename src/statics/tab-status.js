@@ -31,6 +31,8 @@
     c("s-st");
     c("s-p0h");
     c("s-p1h");
+    qs("s-oclr0").hidden = true;
+    qs("s-oclr1").hidden = true;
   }
 
   /**
@@ -245,6 +247,10 @@
         /** sum and count of hours where control is ON (for average price in heading) */
         let cmdSum = 0;
         let cmdCnt = 0;
+        /** true if any manual hour override is shown in this table */
+        let anyOvr = false;
+        /** manual hour overrides: [hourStartEpoch, cmd] pairs */
+        let ovr = si.ovr || [];
         for (let i = 0; i < d.p[dayIndex].length; i++) {
           let row = d.p[dayIndex][i];
           let date = new Date(row[0] * 1000);
@@ -273,6 +279,29 @@
             cmd = false;
           }
 
+          /** relay decision from automatic logic, before any manual override */
+          let auto = cmd;
+
+          //Manual hour override (editable via checkbox)
+          //An hour is "past" once it has fully elapsed - past hours can't be edited
+          let past = date.getTime() + 3600000 <= Date.now();
+          let oc = -1;
+          for (let k = 0; ci.en && !past && k < ovr.length; k++) {
+            if (ovr[k][0] === row[0]) {
+              oc = ovr[k][1];
+              break;
+            }
+          }
+          let overridden = oc >= 0;
+
+          if (overridden) {
+            cmd = oc === 1;
+            if (ci.i) {
+              cmd = !cmd;
+            }
+            anyOvr = true;
+          }
+
           if (cmd) {
             cmdSum += row[1];
             cmdCnt++;
@@ -288,13 +317,21 @@
             bg = !bg;
           }
 
+          let ctrl = ci.en
+            ? `<input type="checkbox" class="ohr${overridden ? " ohr-o" : ""}" data-ts="${row[0]}" data-auto="${auto ? 1 : 0}"${cmd ? " checked" : ""}${past ? " disabled" : ""}>`
+            : (cmd ? "&#x2714;" : "");
+          //Markers are absolutely positioned so they never shift the checkbox alignment
+          let marks = `${overridden ? `<b class="om">&dagger;</b>` : ""}${fon || foff ? `**` : ""}`;
+
           element.innerHTML +=
           `<tr style="${date.getHours() === new Date().getHours() && dayIndex == 0 ? `font-weight:bold;` : ``}${(bg ? "background:#ededed;" : "")}">
             <td class="fit">${formatTime(date, false)}</td>
             <td>${row[1].toFixed(2)} c/kWh</td>
-            <td>${cmd ? "&#x2714;" : ""}${fon || foff ? `**` : ""}</td>
+            <td class="octd">${ctrl}${marks ? `<span class="om-w">${marks}</span>` : ""}</td>
           </tr>`;
         }
+
+        qs("s-oclr" + dayIndex).hidden = !anyOvr;
 
         //Average price of the ON hours -> heading
         if (cmdCnt > 0) {
@@ -318,6 +355,51 @@
       qs("s-cmd").style.color = "red";
     }
   };
+
+  /**
+   * Sets or clears a manual hour override
+   *
+   * @param {number} ts epoch (s) of the hour start - identifies both day and hour
+   * @param {number} c 1 = force on, 0 = force off, -1 = remove that hour, -2 = clear whole day
+   */
+  const setOverride = async (ts, c) => {
+    let res = await getData(`${URLS}?r=o&i=${inst}&ts=${ts}&c=${c}`);
+    if (!res.ok) {
+      alert(`Virhe: ${res.txt}`);
+    }
+    //Re-render from fresh state (avoids fighting the 5 s poll)
+    updateLoop();
+  };
+
+  //Checkbox toggles in the control tables (event delegation - survives innerHTML rebuild)
+  const onOhrChange = (e) => {
+    let t = e.target;
+    if (!t || !t.classList || !t.classList.contains("ohr")) {
+      return;
+    }
+    let want = t.checked ? 1 : 0;
+    let auto = Number(t.getAttribute("data-auto"));
+    let c;
+    if (want === auto) {
+      //Back to what the automatic logic would do -> drop the override
+      c = -1;
+    } else {
+      //Checkbox shows the relay state; override value is stored pre-invert
+      c = state && state.ci && state.ci.i ? (want ? 0 : 1) : want;
+    }
+    t.disabled = true;
+    setOverride(Number(t.getAttribute("data-ts")), c);
+  };
+  qs("s-p0").addEventListener("change", onOhrChange);
+  qs("s-p1").addEventListener("change", onOhrChange);
+
+  //"Palauta automaattiseksi" - clear all overrides for that day (any hour epoch of the day)
+  qs("s-oclr0").addEventListener("click", () => {
+    if (state && state.p[0].length) setOverride(state.p[0][0][0], -2);
+  });
+  qs("s-oclr1").addEventListener("click", () => {
+    if (state && state.p[1].length) setOverride(state.p[1][0][0], -2);
+  });
 
   onUpdate();
   CBS.push(onUpdate);
