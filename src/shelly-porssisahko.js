@@ -38,6 +38,12 @@ const CNST = {
     fCmdTs: 0,
     /** If forced manually, then this is the command */
     fCmd: 0,
+    /**
+     * Manual hour overrides set from the status page.
+     * Array of [hourStartEpoch, cmd] - day-agnostic, entries are pruned once the hour has passed.
+     * NOTE: real value (empty array) is set in initialize() - can't live here as this template is shallow-copied.
+     */
+    ovr: 0,
   },
 
   /** Default configs - deleted from memory after checking */
@@ -922,6 +928,28 @@ function logic(inst) {
       }
     }
 
+    //Manual hour overrides (set from status page).
+    //Entries are absolute [hourStartEpoch, cmd] so they need no day handling:
+    //tomorrow's edits stay valid over midnight, and entries whose hour has passed are dropped here.
+    if (_.s.timeOK) {
+      let nowE = epoch(now);
+      let keep = [];
+
+      for (let k = 0; k < st.ovr.length; k++) {
+        if (st.ovr[k][0] + 3600 > nowE) {
+          //Hour not fully in the past -> keep
+          keep.push(st.ovr[k]);
+
+          if (isCurrentHour(st.ovr[k][0], nowE)) {
+            cmd[inst] = st.ovr[k][1] === 1;
+            st.st = 14;
+          }
+        }
+      }
+
+      st.ovr = keep;
+    }
+
     //Final check - if user wants to set command only for first x minutes
     //Manual force is only thing that overrides
     if (cmd[inst] && _.s.timeOK && now.getMinutes() >= cfg.m) {
@@ -1298,6 +1326,39 @@ function onServerRequest(request, response) {
       response.code = 204;
       GZIP = false;
 
+    } else if (params.r === "o") {
+      //o = manual hour override
+      //  ts = epoch (s) of the hour start (identifies the hour; day handling is not needed)
+      //  c  = 1 (force on), 0 (force off), -1 (remove that hour), -2 (clear the 24 h from ts)
+      if (inst >= 0 && inst < CNST.INST_COUNT && params.ts) {
+        let ts = Number(params.ts);
+        let c = Number(params.c);
+        let nowE = epoch();
+        let si = _.si[inst];
+        let keep = [];
+
+        for (let k = 0; k < si.ovr.length; k++) {
+          let o = si.ovr[k];
+          //Drop: fully-past hours, the target hour itself, and (for c == -2) the whole 24 h window
+          if (o[0] + 3600 > nowE
+            && o[0] !== ts
+            && !(c === -2 && o[0] >= ts && o[0] < ts + 24 * 60 * 60)) {
+            keep.push(o);
+          }
+        }
+
+        //Add the new override (only for a future/current hour)
+        if ((c === 0 || c === 1) && ts + 3600 > nowE) {
+          keep.push([ts, c]);
+        }
+
+        si.ovr = keep;
+        si.chkTs = 0;
+      }
+
+      response.code = 204;
+      GZIP = false;
+
     } else if (!params.r) {
       response.body = atob('#[index.html]');
       MIME_TYPE = MIME_HTML;
@@ -1360,7 +1421,9 @@ function initialize() {
   _.si.pop();
 
   for (let inst = 0; inst < CNST.INST_COUNT; inst++) {
-    _.si.push(Object.assign({}, CNST.DEF_INST_ST));
+    let st = Object.assign({}, CNST.DEF_INST_ST);
+    st.ovr = []; //own array per instance (DEF_INST_ST is shallow-copied)
+    _.si.push(st);
     _.c.i.push(Object.assign({}, CNST.DEF_CFG.INST));
 
     _.c.c.names.push("-");
