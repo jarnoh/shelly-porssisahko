@@ -1282,6 +1282,9 @@ function onServerRequest(request, response) {
       //f = force
       if (inst >= 0 && inst < CNST.INST_COUNT) {
         _.si[inst].fCmdTs = Number(params.ts);
+        if(Number(params.ts)==Number(params.ts.substring(1))) {
+            _.si[inst].fCmdTs += epoch();
+        }
         _.si[inst].fCmd = Number(params.c);
         _.si[inst].chkTs = 0;
       }
