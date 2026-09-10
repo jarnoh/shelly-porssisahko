@@ -29,6 +29,8 @@
     c("s-pi1");
     c("s-info");
     c("s-st");
+    c("s-p0h");
+    c("s-p1h");
   }
 
   /**
@@ -240,6 +242,9 @@
 
         let per = 0;
         let bg = false;
+        /** sum and count of hours where control is ON (for average price in heading) */
+        let cmdSum = 0;
+        let cmdCnt = 0;
         for (let i = 0; i < d.p[dayIndex].length; i++) {
           let row = d.p[dayIndex][i];
           let date = new Date(row[0] * 1000);
@@ -268,6 +273,11 @@
             cmd = false;
           }
 
+          if (cmd) {
+            cmdSum += row[1];
+            cmdCnt++;
+          }
+
           if (ci.en && ci.mode === 2
             && ((ci.m2.p < 0 && (i == ci.m2.ps || i == ci.m2.pe))
               || (ci.m2.p == -2 && (i == ci.m2.ps2 || i == ci.m2.pe2))
@@ -284,6 +294,13 @@
             <td>${row[1].toFixed(2)} c/kWh</td>
             <td>${cmd ? "&#x2714;" : ""}${fon || foff ? `**` : ""}</td>
           </tr>`;
+        }
+
+        //Average price of the ON hours -> heading
+        if (cmdCnt > 0) {
+          /** heading element for this day ("Toteutuma tänään/huomenna") */
+          let headingEl = qs(dayIndex == 0 ? "s-p0h" : "s-p1h");
+          headingEl.innerHTML = ` ${cmdCnt}h ${(cmdSum / cmdCnt).toFixed(2)} c/kWh`;
         }
 
         return s.p[dayIndex].ts;
