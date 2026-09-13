@@ -286,7 +286,7 @@
           //An hour is "past" once it has fully elapsed - past hours can't be edited
           let past = date.getTime() + 3600000 <= Date.now();
           let oc = -1;
-          for (let k = 0; ci.en && !past && k < ovr.length; k++) {
+          for (let k = 0; ci.en && k < ovr.length; k++) {
             if (ovr[k][0] === row[0]) {
               oc = ovr[k][1];
               break;

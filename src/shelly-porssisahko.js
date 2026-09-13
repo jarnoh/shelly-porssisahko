@@ -929,15 +929,17 @@ function logic(inst) {
     }
 
     //Manual hour overrides (set from status page).
-    //Entries are absolute [hourStartEpoch, cmd] so they need no day handling:
-    //tomorrow's edits stay valid over midnight, and entries whose hour has passed are dropped here.
+    //Entries are absolute [hourStartEpoch, cmd]. Keep today's history until
+    //the local day changes, so the status page can show the actual decisions
+    //for the completed hours. Future entries remain valid over midnight.
     if (_.s.timeOK) {
       let nowE = epoch(now);
+      let todayStart = epoch(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
       let keep = [];
 
       for (let k = 0; k < st.ovr.length; k++) {
-        if (st.ovr[k][0] + 3600 > nowE) {
-          //Hour not fully in the past -> keep
+        if (st.ovr[k][0] + 3600 > todayStart) {
+          //Keep current-day and future overrides; remove them after the day.
           keep.push(st.ovr[k]);
 
           if (isCurrentHour(st.ovr[k][0], nowE)) {
@@ -1339,15 +1341,16 @@ function onServerRequest(request, response) {
 
         for (let k = 0; k < si.ovr.length; k++) {
           let o = si.ovr[k];
-          //Drop: fully-past hours, the target hour itself, and (for c == -2) the whole 24 h window
-          if (o[0] + 3600 > nowE
+          let todayStart = epoch(new Date(new Date(nowE * 1000).getFullYear(), new Date(nowE * 1000).getMonth(), new Date(nowE * 1000).getDate()));
+          //Drop: hours from before today, the target hour itself, and (for c == -2) the whole 24 h window
+          if (o[0] + 3600 > todayStart
             && o[0] !== ts
             && !(c === -2 && o[0] >= ts && o[0] < ts + 24 * 60 * 60)) {
             keep.push(o);
           }
         }
 
-        //Add the new override (only for a future/current hour)
+        //Add the new override only for a future/current hour.
         if ((c === 0 || c === 1) && ts + 3600 > nowE) {
           keep.push([ts, c]);
         }
